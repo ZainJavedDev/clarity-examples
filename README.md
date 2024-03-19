@@ -1,3 +1,8 @@
+# To parse an example replay, run the below command
+
+./gradlew combatlogPackage
+$JAVA_HOME/bin/java -jar build/libs/combatlog.jar replays/7632393745_816460667.dem
+
 # Clarity-examples
 
 This project contains example code for the [clarity replay parser](https://github.com/skadistats/clarity).
