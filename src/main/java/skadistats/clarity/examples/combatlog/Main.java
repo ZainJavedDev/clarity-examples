@@ -6,28 +6,19 @@ import skadistats.clarity.model.CombatLogEntry;
 import skadistats.clarity.processor.gameevents.OnCombatLogEntry;
 import skadistats.clarity.processor.runner.SimpleRunner;
 import skadistats.clarity.source.MappedFileSource;
-import skadistats.clarity.wire.dota.common.proto.DOTAUserMessages;
-
-import java.time.Duration;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class Main {
 
     private final Logger log = LoggerFactory.getLogger(Main.class.getPackage().getClass());
 
-    private final DateTimeFormatter GAMETIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
-
     private String compileName(String attackerName, boolean isIllusion) {
         return attackerName != null ? attackerName + (isIllusion ? " (illusion)" : "") : "UNKNOWN";
-    }
-
-    private String getAttackerNameCompiled(CombatLogEntry cle) {
-        return compileName(cle.getAttackerName(), cle.isAttackerIllusion());
     }
 
     private String getTargetNameCompiled(CombatLogEntry cle) {
@@ -125,38 +116,50 @@ public class Main {
     }
 
     public void run(String[] args) throws Exception {
+        String csvFilePath = "test.csv";
         long tStart = System.currentTimeMillis();
         new SimpleRunner(new MappedFileSource(args[0])).runWith(this);
         long tMatch = System.currentTimeMillis() - tStart;
 
-        for (Map.Entry<String, SpellInfo> entry : spellInfoMap.entrySet()) {
-            System.out.println("Key: " + entry.getKey());
-            SpellInfo spellInfo = entry.getValue();
-            for (String cast : spellInfo.casts) {
-                Integer targetCount = 0;
-                float castFloat = Float.parseFloat(cast);
-                System.out.println("cast time: " + castFloat);
-                for (Map<String, String> target : spellInfo.targets) {
-                    for (Map.Entry<String, String> targetEntry : target.entrySet()) {
-                        String targetName = targetEntry.getKey();
-                        float targetTimeFloat = Float.parseFloat(targetEntry.getValue());
-                        if (targetTimeFloat > castFloat && targetTimeFloat < castFloat + 5) {
-                            System.out.println("target time: " + targetEntry.getValue());
-                            System.out.println("traget name: " + targetName);
-                            targetCount+=1;
+        try (FileWriter fileWriter = new FileWriter(csvFilePath, true)) {
+            for (Map.Entry<String, SpellInfo> entry : spellInfoMap.entrySet()) {
+                System.out.println("Key: " + entry.getKey());
+                SpellInfo spellInfo = entry.getValue();
+                for (String cast : spellInfo.casts) {
+                    Integer targetCount = 0;
+                    float castFloat = Float.parseFloat(cast);
+                    System.out.println("cast time: " + castFloat);
+                    for (Map<String, String> target : spellInfo.targets) {
+                        for (Map.Entry<String, String> targetEntry : target.entrySet()) {
+                            String targetName = targetEntry.getKey();
+                            float targetTimeFloat = Float.parseFloat(targetEntry.getValue());
+                            if (targetTimeFloat > castFloat && targetTimeFloat < castFloat + 5) {
+                                System.out.println("target time: " + targetEntry.getValue());
+                                System.out.println("traget name: " + targetName);
+                                targetCount += 1;
+                            }
                         }
                     }
-                }
 
-                System.out.println("total targets hit: ");
-                System.out.println(targetCount);
-                if (targetCount==0) {
-                    System.out.println("MISSED LOL");
+                    System.out.println("total targets hit: ");
+                    System.out.println(targetCount);
+                    if (targetCount == 0) {
+                        System.out.println("MISSED LOL");
+                        fileWriter.append(entry.getKey());
+                        fileWriter.append(",");
+                        fileWriter.append(Float.toString(castFloat));
+                        fileWriter.append(",");
+                        fileWriter.append("Missed");
+                        fileWriter.append("\n");
+                    }
+                    System.out.println("\n\n\nnext cast:");
                 }
-                System.out.println("\n\n\nnext cast:");
             }
-            // System.out.println("Targets: " + spellInfo.targets);
+        } catch (IOException e) {
+            System.out.println("An error occurred while writing to the CSV file");
+            e.printStackTrace();
         }
+
         log.info("total time taken: {}s", (tMatch) / 1000.0);
     }
 
