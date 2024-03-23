@@ -6,3 +6,4 @@
 /flattables_*
 /baselines
 *.csv
+*.json
