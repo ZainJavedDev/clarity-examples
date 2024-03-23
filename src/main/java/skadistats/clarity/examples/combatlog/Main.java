@@ -1,3 +1,7 @@
+// *****  ALL IDEAS  ***** \\
+// where faceless hits all his allies with chrono and then dies right after
+// where faceless void hits 0 enemies with chrono
+
 package skadistats.clarity.examples.combatlog;
 
 import org.slf4j.Logger;
@@ -10,15 +14,26 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
+import com.google.gson.Gson;
+
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class Main {
 
     private final Logger log = LoggerFactory.getLogger(Main.class.getPackage().getClass());
 
+    private final DateTimeFormatter GAMETIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+
     private String compileName(String attackerName, boolean isIllusion) {
         return attackerName != null ? attackerName + (isIllusion ? " (illusion)" : "") : "UNKNOWN";
+    }
+
+    private String getAttackerNameCompiled(CombatLogEntry cle) {
+        return compileName(cle.getAttackerName(), cle.isAttackerIllusion());
     }
 
     private String getTargetNameCompiled(CombatLogEntry cle) {
@@ -39,6 +54,9 @@ public class Main {
 
     @OnCombatLogEntry
     public void onCombatLogEntry(CombatLogEntry cle) {
+        Duration gameTimeMillis = Duration.ofMillis((int) (1000.0f * cle.getTimestamp()));
+        LocalTime gameTime = LocalTime.MIDNIGHT.plus(gameTimeMillis);
+        String time = "[" + GAMETIME_FORMATTER.format(gameTime) + "]";
         switch (cle.getType()) {
             case DOTA_COMBATLOG_DAMAGE:
                 if (getTargetNameCompiled(cle).contains("npc_dota_hero")
@@ -46,6 +64,7 @@ public class Main {
 
                     if ("earthshaker_echo_slam".equals(cle.getInflictorName())
                             || "tidehunter_ravage".equals(cle.getInflictorName())
+                            // || "faceless_void_chronosphere".equals(cle.getInflictorName())
                             || "magnataur_reverse_polarity".equals(cle.getInflictorName())) {
 
                         SpellInfo spellInfo = spellInfoMap.get(cle.getInflictorName());
@@ -72,24 +91,39 @@ public class Main {
                     }
                 }
                 break;
-            // case DOTA_COMBATLOG_MODIFIER_ADD:
-            // log.info("{} {} receives {} buff/debuff from {}",
-            // time,
-            // getTargetNameCompiled(cle),
-            // cle.getInflictorName(),
-            // getAttackerNameCompiled(cle)
-            // );
-            // break;
+            case DOTA_COMBATLOG_MODIFIER_ADD:
+
+                if (getTargetNameCompiled(cle).contains("npc_dota_hero")
+                        && !getTargetNameCompiled(cle).contains("illusion")) {
+                    if ("modifier_faceless_void_chronosphere_freeze".equals(cle.getInflictorName())) {
+                        SpellInfo spellInfo = spellInfoMap.get("faceless_void_chronosphere");
+                        if (spellInfo == null) {
+                            spellInfo = new SpellInfo();
+                            spellInfoMap.put("faceless_void_chronosphere", spellInfo);
+                        }
+                        
+                        Map<String, String> target = new HashMap<>();
+                        target.put(getTargetNameCompiled(cle), String.valueOf(cle.getTimestamp()));
+                        spellInfo.targets.add(target);
+                        
+                        log.info("{} {} receives {} buff/debuff from {}",
+                        time,
+                        getTargetNameCompiled(cle),
+                        "faceless_void_chronosphere",
+                        getAttackerNameCompiled(cle));
+                    }
+                }
+                break;
             // case DOTA_COMBATLOG_MODIFIER_REMOVE:
             // log.info("{} {} loses {} buff/debuff",
             // time,
             // getTargetNameCompiled(cle),
-            // cle.getInflictorName()
-            // );
+            // cle.getInflictorName());
             // break;
             case DOTA_COMBATLOG_ABILITY:
                 if ("earthshaker_echo_slam".equals(cle.getInflictorName()) ||
                         "tidehunter_ravage".equals(cle.getInflictorName()) ||
+                        "faceless_void_chronosphere".equals(cle.getInflictorName()) ||
                         "magnataur_reverse_polarity".equals(cle.getInflictorName())) {
                     SpellInfo spellInfo = spellInfoMap.get(cle.getInflictorName());
                     if (spellInfo == null) {
@@ -122,6 +156,14 @@ public class Main {
         long tMatch = System.currentTimeMillis() - tStart;
 
         try (FileWriter fileWriter = new FileWriter(csvFilePath, true)) {
+            Gson gson = new Gson();
+            String json = gson.toJson(spellInfoMap);
+
+            try (FileWriter writer = new FileWriter("map.json")) {
+                writer.write(json);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             for (Map.Entry<String, SpellInfo> entry : spellInfoMap.entrySet()) {
                 System.out.println("Key: " + entry.getKey());
                 SpellInfo spellInfo = entry.getValue();

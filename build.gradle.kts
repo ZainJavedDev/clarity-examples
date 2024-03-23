@@ -21,6 +21,7 @@ repositories {
 dependencies {
     api("com.skadistats:clarity:3.0.0")
     api("ch.qos.logback:logback-classic:1.4.7")
+    implementation("com.google.code.gson:gson:2.10.1")
 }
 
 File("src/main/java/skadistats/clarity/examples").walk().maxDepth(1).forEach {
