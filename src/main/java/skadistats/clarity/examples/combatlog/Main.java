@@ -64,7 +64,6 @@ public class Main {
 
                     if ("earthshaker_echo_slam".equals(cle.getInflictorName())
                             || "tidehunter_ravage".equals(cle.getInflictorName())
-                            // || "faceless_void_chronosphere".equals(cle.getInflictorName())
                             || "magnataur_reverse_polarity".equals(cle.getInflictorName())) {
 
                         SpellInfo spellInfo = spellInfoMap.get(cle.getInflictorName());

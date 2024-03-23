@@ -1,0 +1,8 @@
+spells done for 0 heroes hit fail: 
+    earthshaker echo slam
+    magnus RP
+    tidehunter ravage
+
+get others as well from the get eligible matches function in steam matches getter
+
+Taking approximately 2s for an average game. Download will be the bottleneck
