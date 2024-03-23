@@ -6,19 +6,28 @@ package skadistats.clarity.examples.combatlog;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import skadistats.clarity.Clarity;
 import skadistats.clarity.model.CombatLogEntry;
 import skadistats.clarity.processor.gameevents.OnCombatLogEntry;
 import skadistats.clarity.processor.runner.SimpleRunner;
 import skadistats.clarity.source.MappedFileSource;
+import skadistats.clarity.wire.shared.demo.proto.Demo.CDemoFileInfo;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.time.Duration;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonArray;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -41,6 +50,7 @@ public class Main {
     }
 
     private Map<String, SpellInfo> spellInfoMap = new HashMap<>();
+    private Map<String, Integer> heroTeamMap = new HashMap<>();
 
     private static class SpellInfo {
         List<String> casts = new ArrayList<>();
@@ -100,16 +110,16 @@ public class Main {
                             spellInfo = new SpellInfo();
                             spellInfoMap.put("faceless_void_chronosphere", spellInfo);
                         }
-                        
+
                         Map<String, String> target = new HashMap<>();
                         target.put(getTargetNameCompiled(cle), String.valueOf(cle.getTimestamp()));
                         spellInfo.targets.add(target);
-                        
+
                         log.info("{} {} receives {} buff/debuff from {}",
-                        time,
-                        getTargetNameCompiled(cle),
-                        "faceless_void_chronosphere",
-                        getAttackerNameCompiled(cle));
+                                time,
+                                getTargetNameCompiled(cle),
+                                "faceless_void_chronosphere",
+                                getAttackerNameCompiled(cle));
                     }
                 }
                 break;
@@ -149,14 +159,48 @@ public class Main {
     }
 
     public void run(String[] args) throws Exception {
+        CDemoFileInfo info = Clarity.infoForFile(args[0]);
+        Gson gson = new Gson();
+        String json = gson.toJson(info);
+
+        JsonElement jsonTree = JsonParser.parseString(json);
+        JsonObject jsonObject = jsonTree.getAsJsonObject();
+        JsonObject gameInfo = jsonObject.getAsJsonObject("gameInfo_");
+
+        JsonObject dota = gameInfo.getAsJsonObject("dota_");
+
+        JsonArray playerInfoArray = dota.getAsJsonArray("playerInfo_");
+        for (JsonElement playerInfoElement : playerInfoArray) {
+            JsonObject playerInfoObject = playerInfoElement.getAsJsonObject();
+            int gameTeam = playerInfoObject.get("gameTeam_").getAsInt();
+            String heroName = "";
+
+            JsonElement heroNameElement = playerInfoObject.get("heroName_");
+            if (heroNameElement.isJsonObject()) {
+                JsonArray bytesArray = heroNameElement.getAsJsonObject().getAsJsonArray("bytes");
+                byte[] bytes = new byte[bytesArray.size()];
+                for (int i = 0; i < bytesArray.size(); i++) {
+                    bytes[i] = bytesArray.get(i).getAsByte();
+                }
+                heroName = new String(bytes, StandardCharsets.UTF_8);
+            } else if (heroNameElement.isJsonPrimitive()) {
+                heroName = heroNameElement.getAsString();
+            }
+
+            heroTeamMap.put(heroName, gameTeam);
+
+            System.out.println(heroName);
+            System.out.println(gameTeam);
+
+        }
+
         String csvFilePath = "test.csv";
         long tStart = System.currentTimeMillis();
         new SimpleRunner(new MappedFileSource(args[0])).runWith(this);
         long tMatch = System.currentTimeMillis() - tStart;
 
         try (FileWriter fileWriter = new FileWriter(csvFilePath, true)) {
-            Gson gson = new Gson();
-            String json = gson.toJson(spellInfoMap);
+            json = gson.toJson(spellInfoMap);
 
             try (FileWriter writer = new FileWriter("map.json")) {
                 writer.write(json);
@@ -174,10 +218,20 @@ public class Main {
                         for (Map.Entry<String, String> targetEntry : target.entrySet()) {
                             String targetName = targetEntry.getKey();
                             float targetTimeFloat = Float.parseFloat(targetEntry.getValue());
-                            if (targetTimeFloat > castFloat && targetTimeFloat < castFloat + 5) {
+                            if (targetTimeFloat >= castFloat && targetTimeFloat < castFloat + 5) {
                                 System.out.println("target time: " + targetEntry.getValue());
                                 System.out.println("traget name: " + targetName);
-                                targetCount += 1;
+                                if (entry.getKey().equals("faceless_void_chronosphere")) {
+                                    Integer facelessVoidTeam = heroTeamMap.get("npc_dota_hero_faceless_void");
+                                    Integer targetNameTeam = heroTeamMap.get(targetName);
+                                    if (!facelessVoidTeam.equals(targetNameTeam)) {
+                                        targetCount += 1;
+                                    }
+                                    System.out.println("targetCount");
+                                    System.out.println(targetCount);
+                                } else {
+                                    targetCount += 1;
+                                }
                             }
                         }
                     }

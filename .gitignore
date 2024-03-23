@@ -6,4 +6,5 @@
 /flattables_*
 /baselines
 *.csv
-*.json
+map.json
+info.json
