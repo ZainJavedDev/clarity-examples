@@ -168,6 +168,7 @@ public class Main {
         JsonObject gameInfo = jsonObject.getAsJsonObject("gameInfo_");
 
         JsonObject dota = gameInfo.getAsJsonObject("dota_");
+        long matchId = dota.getAsJsonPrimitive("matchId_").getAsLong();
 
         JsonArray playerInfoArray = dota.getAsJsonArray("playerInfo_");
         for (JsonElement playerInfoElement : playerInfoArray) {
@@ -240,6 +241,8 @@ public class Main {
                     System.out.println(targetCount);
                     if (targetCount == 0) {
                         System.out.println("MISSED LOL");
+                        fileWriter.append(String.valueOf(matchId));
+                        fileWriter.append(",");
                         fileWriter.append(entry.getKey());
                         fileWriter.append(",");
                         fileWriter.append(Float.toString(castFloat));
